@@ -649,95 +649,35 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
 
     private void internalTransitionTo(ScrimState state, Callback callback) {
         debugLog("internalTransitionTo to state " + state.name());
+        
+        if (state == ScrimState.UNLOCKED) {
+            mState = state;
+            mInFrontAlpha = 0f;
+            mBehindAlpha = 0f;
+            mNotificationsAlpha = 0f;
+            
+            if (mScrimInFront != null) mScrimInFront.setViewAlpha(0f);
+            if (mScrimBehind != null) mScrimBehind.setViewAlpha(0f);
+            if (mNotificationsScrim != null) mNotificationsScrim.setViewAlpha(0f);
+            
+            mInFrontTint = Color.TRANSPARENT;
+            mBehindTint = Color.TRANSPARENT;
+            mNotificationsTint = Color.TRANSPARENT;
+            
+            setExpansionAffectsAlpha(false);
+            dispatchScrimsVisible();
+            if (callback != null) {
+                callback.onFinished();
+            }
+            return;
+        }
+
         if (mIsBouncerToGoneTransitionRunning) {
             Log.i(TAG, "Skipping transition to: " + state
                     + " while mIsBouncerToGoneTransitionRunning");
             return;
         }
-        if (state == mState) {
-            // Call the callback anyway, unless it's already enqueued
-            if (callback != null && mCallback != callback) {
-                callback.onFinished();
-            }
-            return;
-        } else {
-            debugLog("State changed to: " + state);
-        }
-
-        if (state == ScrimState.UNINITIALIZED) {
-            throw new IllegalArgumentException("Cannot change to UNINITIALIZED.");
-        }
-
-        final ScrimState oldState = mState;
-        mState = state;
-        TrackTracer.instantForGroup("scrim", "state", mState.ordinal());
-
-        if (mCallback != null) {
-            mCallback.onCancelled();
-        }
-        mCallback = callback;
-
-        state.prepare(oldState);
-        mScreenBlankingCallbackCalled = false;
-        mAnimationDelay = 0;
-        mBlankScreen = state.getBlanksScreen();
-        mAnimateChange = state.getAnimateChange();
-        mAnimationDuration = state.getAnimationDuration();
-
-        if (mState == ScrimState.GLANCEABLE_HUB_OVER_DREAM) {
-            // When the device is docked while on GLANCEABLE_HUB, the dream starts underneath the
-            // hub and the ScrimState transitions to GLANCEABLE_HUB_OVER_DREAM. To prevent the
-            // scrims from flickering in during this transition, we set the panel expansion
-            // fraction, which is 1 when idle on GLANCEABLE_HUB, to 0. This only occurs when the hub
-            // is open because the hub lives in the same window as the shade, which is not visible
-            // when transitioning from KEYGUARD to DREAMING.
-            mPanelExpansionFraction = 0f;
-        }
-
-        applyState();
-
-        mScrimInFront.setBlendWithMainColor(state.shouldBlendWithMainColor());
-
-        // Cancel blanking transitions that were pending before we requested a new state
-        if (mPendingFrameCallback != null) {
-            mScrimBehind.removeCallbacks(mPendingFrameCallback);
-            mPendingFrameCallback = null;
-        }
-        if (mHandler.hasCallbacks(mBlankingTransitionRunnable)) {
-            mHandler.removeCallbacks(mBlankingTransitionRunnable);
-            mBlankingTransitionRunnable = null;
-        }
-
-        // Showing/hiding the keyguard means that scrim colors have to be switched, not necessary
-        // to do the same when you're just showing the brightness mirror.
-        mNeedsDrawableColorUpdate = state != ScrimState.BRIGHTNESS_MIRROR;
-
-        // The device might sleep if it's entering AOD, we need to make sure that
-        // the animation plays properly until the last frame.
-        // It's important to avoid holding the wakelock unless necessary because
-        // WakeLock#aqcuire will trigger an IPC and will cause jank.
-        if (mState.isLowPowerState()) {
-            holdWakeLock();
-        }
-
-        if (mKeyguardUpdateMonitor.needsSlowUnlockTransition() && mState == ScrimState.UNLOCKED) {
-            mAnimationDelay = CentralSurfaces.FADE_KEYGUARD_START_DELAY;
-            scheduleUpdate();
-        } else if (((oldState == ScrimState.AOD || oldState == ScrimState.PULSING)  // leaving doze
-                && (!mDozeParameters.getAlwaysOn() || mState == ScrimState.UNLOCKED))
-                || (mState == ScrimState.AOD && !mDozeParameters.getDisplayNeedsBlanking())) {
-            // Scheduling a frame isn't enough when:
-            //  • Leaving doze and we need to modify scrim color immediately
-            //  • ColorFade Feld down and scrim cannot wait for pre-draw.
-            onPreDraw();
-        } else {
-            // Schedule a frame
-            scheduleUpdate();
-        }
-
-        dispatchBackScrimState(mScrimBehind.getViewAlpha());
     }
-
     private static void debugLog(String state) {
         if (DEBUG) {
             Log.d(TAG, state);
