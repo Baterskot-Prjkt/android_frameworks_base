@@ -74,13 +74,6 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     final SubscriptionInfo mSubscriptionInfo;
     private Map<String, MobileIconGroup> mNetworkToIconLookup;
 
-    private static final String DATA_DISABLED_ICON =
-            "system:" + Settings.System.DATA_DISABLED_ICON;
-    private static final String SHOW_FOURG_ICON =
-            "system:" + Settings.System.SHOW_FOURG_ICON;
-
-    private boolean mDataDisabledIcon;
-
     private MobileIconGroup mDefaultIcons;
     private Config mConfig;
     @VisibleForTesting
@@ -169,26 +162,6 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
             }
         };
         mMobileStatusTracker = mobileStatusTrackerFactory.createTracker(mMobileCallback);
-
-        mTunerService = Dependency.get(TunerService.class);
-    }
-
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        switch (key) {
-            case DATA_DISABLED_ICON:
-                mDataDisabledIcon =
-                    TunerService.parseIntegerSwitch(newValue, true);
-                updateTelephony();
-                break;
-            case SHOW_FOURG_ICON:
-                mConfig = Config.readConfig(mContext);
-                setConfiguration(mConfig);
-                notifyListeners();
-                break;
-            default:
-                break;
-        }
     }
 
     void setConfiguration(Config config) {
@@ -233,8 +206,6 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(
                 Global.MOBILE_DATA + mSubscriptionInfo.getSubscriptionId()),
                 true, mObserver);
-        mTunerService.addTunable(this, DATA_DISABLED_ICON);
-        mTunerService.addTunable(this, SHOW_FOURG_ICON);
     }
 
     /**

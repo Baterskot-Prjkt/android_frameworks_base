@@ -132,8 +132,6 @@ interface MobileIconInteractor {
 
     /** True when in carrier network change mode */
     val carrierNetworkChangeActive: Flow<Boolean>
-
-    val shouldShowFourgIcon: StateFlow<Boolean>
 }
 
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
@@ -163,54 +161,6 @@ class MobileIconInteractorImpl(
 
     override val carrierNetworkChangeActive: StateFlow<Boolean> =
         connectionRepository.carrierNetworkChangeActive
-
-    private final val DATA_DISABLED_ICON: String =
-            "system:" + Settings.System.DATA_DISABLED_ICON;
-
-    private val shouldShowExclamationMark: StateFlow<Boolean> =
-        conflatedCallbackFlow {
-                val callback =
-                    object : TunerService.Tunable {
-                        override fun onTuningChanged(key: String, newValue: String?) {
-                            when (key) {
-                                DATA_DISABLED_ICON -> 
-                                    trySend(TunerService.parseIntegerSwitch(newValue, true))
-                            }
-                        }
-                    }
-                Dependency.get(TunerService::class.java).addTunable(callback, DATA_DISABLED_ICON)
-
-                awaitClose { Dependency.get(TunerService::class.java).removeTunable(callback) }
-            }
-            .stateIn(
-                scope,
-                started = SharingStarted.WhileSubscribed(),
-                true
-            )
-
-    private final val SHOW_FOURG_ICON: String =
-            "system:" + Settings.System.SHOW_FOURG_ICON;
-
-    override val shouldShowFourgIcon: StateFlow<Boolean> =
-        conflatedCallbackFlow {
-                val callback =
-                    object : TunerService.Tunable {
-                        override fun onTuningChanged(key: String, newValue: String?) {
-                            when (key) {
-                                SHOW_FOURG_ICON -> 
-                                    trySend(TunerService.parseIntegerSwitch(newValue, false))
-                            }
-                        }
-                    }
-                Dependency.get(TunerService::class.java).addTunable(callback, SHOW_FOURG_ICON)
-
-                awaitClose { Dependency.get(TunerService::class.java).removeTunable(callback) }
-            }
-            .stateIn(
-                scope,
-                started = SharingStarted.WhileSubscribed(),
-                true
-            )
 
     // True if there exists _any_ icon override for this carrierId. Note that overrides can include
     // any or none of the icon groups defined in MobileMappings, so we still need to check on a
