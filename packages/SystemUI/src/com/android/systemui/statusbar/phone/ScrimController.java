@@ -646,7 +646,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     public void legacyTransitionTo(ScrimState state, Callback callback) {
         internalTransitionTo(state, callback);
     }
-
+    
     private void internalTransitionTo(ScrimState state, Callback callback) {
         debugLog("internalTransitionTo to state " + state.name());
         
@@ -677,7 +677,31 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                     + " while mIsBouncerToGoneTransitionRunning");
             return;
         }
+
+        if (state == mState) {
+            if (callback != null && mCallback != callback) {
+                callback.onFinished();
+            }
+            return;
+        }
+
+        mState = state;
+
+        if (mCallback != null) {
+            mCallback.onCancelled();
+        }
+        mCallback = callback;
+
+        state.prepare(state);
+        mScreenBlankingCallbackCalled = false;
+        mAnimationDelay = 0;
+        mBlankScreen = state.getBlanksScreen();
+        mAnimateChange = state.getAnimateChange();
+        mAnimationDuration = state.getAnimationDuration();
+
+        applyAndDispatchState();
     }
+
     private static void debugLog(String state) {
         if (DEBUG) {
             Log.d(TAG, state);
