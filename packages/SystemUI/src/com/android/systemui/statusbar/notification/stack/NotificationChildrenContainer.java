@@ -56,7 +56,6 @@ import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.Roundable;
 import com.android.systemui.statusbar.notification.RoundableState;
 import com.android.systemui.statusbar.notification.SourceType;
-import com.android.systemui.statusbar.notification.row.BundleHeaderBlurView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.HybridGroupManager;
@@ -133,10 +132,8 @@ public class NotificationChildrenContainer extends ViewGroup
      * view variants have to be null.
      */
     private ComposeView mBundleHeaderView;
-    private BundleHeaderBlurView mBundleHeaderBlurView;
     @Nullable private BundleHeaderViewModel mBundleHeaderViewModel;
     private BundleHeaderViewWrapper mBundleHeaderWrapper;
-    private boolean mBundleHeaderBlurEnabled;
 
     private NotificationHeaderView mGroupHeader;
     private NotificationHeaderViewWrapper mGroupHeaderWrapper;
@@ -268,8 +265,6 @@ public class NotificationChildrenContainer extends ViewGroup
                     mMinimizedGroupHeader.getMeasuredHeight());
         }
         if (mBundleHeaderView != null) {
-            mBundleHeaderBlurView.layout(0, 0, mBundleHeaderView.getMeasuredWidth(),
-                    mBundleHeaderView.getMeasuredHeight());
             mBundleHeaderView.layout(0, 0, mBundleHeaderView.getMeasuredWidth(),
                     mBundleHeaderView.getMeasuredHeight());
         }
@@ -327,9 +322,6 @@ public class NotificationChildrenContainer extends ViewGroup
         if (mBundleHeaderView != null) {
             mBundleHeaderView.measure(widthMeasureSpec,
                     MeasureSpec.makeMeasureSpec(getHeaderHeight(), MeasureSpec.UNSPECIFIED));
-            mBundleHeaderBlurView.measure(widthMeasureSpec,
-                    MeasureSpec.makeMeasureSpec(mBundleHeaderView.getMeasuredHeight(),
-                            MeasureSpec.EXACTLY));
         }
 
         setMeasuredDimension(width, height);
@@ -382,7 +374,6 @@ public class NotificationChildrenContainer extends ViewGroup
         mAttachedChildren.add(newIndex, row);
         addView(row);
         row.setUserLocked(mUserLocked);
-        row.setDozing(mContainingNotification.isNotificationDozing());
 
         View divider = inflateDivider();
         addView(divider);
@@ -525,50 +516,17 @@ public class NotificationChildrenContainer extends ViewGroup
         if (NotificationBundleUi.isUnexpectedlyInLegacyMode()) return;
         initBundleDimens();
         mBundleHeaderView = view;
-        mBundleHeaderBlurView = new BundleHeaderBlurView(getContext());
-        mBundleHeaderBlurView.setOnBlurStateChangedListener(this::updateBundleHeaderBlur);
-        addView(mBundleHeaderBlurView);
         addView(mBundleHeaderView);
         mBundleHeaderWrapper = (BundleHeaderViewWrapper) NotificationViewWrapper.wrap(getContext(),
                 mBundleHeaderView, mContainingNotification);
         mBundleHeaderWrapper.setOnRoundnessChangedListener(this::invalidate);
-        updateBundleHeaderBlur();
         invalidate();
     }
 
     public void setBundleHeaderViewModel(@Nullable BundleHeaderViewModel viewModel) {
         mBundleHeaderViewModel = viewModel;
-        if (mContainingNotification != null) {
-            mBundleHeaderBlurEnabled =
-                    mContainingNotification.shouldUseBundleHeaderBlurBackground();
-        }
         setChildrenExpanded(mContainingNotification.isGroupExpanded());
-        updateBundleHeaderBlur();
         invalidate();
-    }
-
-    public void setBundleHeaderBlurEnabled(boolean enabled) {
-        if (mBundleHeaderBlurEnabled == enabled) {
-            return;
-        }
-        mBundleHeaderBlurEnabled = enabled;
-        updateBundleHeaderBlur();
-    }
-
-    private void updateBundleHeaderBlur() {
-        if (mContainingNotification == null || mBundleHeaderBlurView == null 
-            || mBundleHeaderViewModel == null || mBundleHeaderView == null) {
-            return;
-        }
-        
-        boolean isOnKeyguard = mContainingNotification.isOnKeyguard();
-        mBundleHeaderViewModel.setIsOnKeyguard(isOnKeyguard);
-
-        boolean shouldBlur = mBundleHeaderBlurEnabled;
-        mBundleHeaderBlurView.setAxBlurEnabled(shouldBlur);
-
-        boolean canBlur = shouldBlur && mBundleHeaderBlurView.isCrossWindowBlurActive();
-        mBundleHeaderViewModel.setUseBlurBackground(canBlur);
     }
 
     private void initBundleDimens() {
@@ -1251,7 +1209,7 @@ public class NotificationChildrenContainer extends ViewGroup
         }
 
         boolean isHeader = child instanceof NotificationHeaderView || (isBundle()
-                && (child instanceof ComposeView || child instanceof BundleHeaderBlurView));
+                && child instanceof ComposeView);
         if (isHeader && getRoundableHeaderWrapper().hasRoundedCorner()) {
             float[] radii = getRoundableHeaderWrapper().getUpdatedRadii();
             mHeaderPath.reset();
@@ -1546,7 +1504,6 @@ public class NotificationChildrenContainer extends ViewGroup
             } else {
                 mBundleHeaderViewModel.setBackgroundDrawable(null);
             }
-            updateBundleHeaderBlur();
         }
     }
 

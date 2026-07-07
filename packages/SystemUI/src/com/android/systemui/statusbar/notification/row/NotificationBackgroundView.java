@@ -21,7 +21,6 @@ import static com.android.systemui.util.ColorUtilKt.hexColorString;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -37,9 +36,6 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.axion.blur.AxBlurBackgroundRenderer;
-import com.android.axion.blur.AxBlurColors;
-import com.android.axion.blur.model.AxBackdropBlurSettingsSpec;
 import com.android.internal.util.ContrastColorUtil;
 import com.android.systemui.Dumpable;
 import com.android.systemui.common.shared.colors.SurfaceEffectColors;
@@ -56,9 +52,6 @@ import java.util.Arrays;
 public class NotificationBackgroundView extends View implements Dumpable,
         ExpandableNotificationRow.DismissButtonTargetVisibilityListener {
 
-    private final AxBlurBackgroundRenderer mAxBlurRenderer;
-    private final Object mAxBlurKey = new Object();
-    private final Rect mBackgroundBounds = new Rect();
     private final boolean mDontModifyCorners;
     private Drawable mBackground;
     private int mClipTopAmount;
@@ -83,17 +76,12 @@ public class NotificationBackgroundView extends View implements Dumpable,
     private int mNormalColor;
     private final int convexR = 9;
     private final int concaveR = 22;
-    private boolean mAxBlurEnabled;
-    private int mAxBlurOverlayColor;
 
     // True only if the dismiss button is visible.
     private boolean mDrawDismissButtonCutout = false;
 
     public NotificationBackgroundView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mAxBlurRenderer = new AxBlurBackgroundRenderer(this, AxBackdropBlurSettingsSpec.system(),
-                false);
-        mAxBlurOverlayColor = AxBlurColors.surfaceBrightTint(getContext());
         mDontModifyCorners = getResources().getBoolean(R.bool.config_clipNotificationsToOutline);
         mLightColoredStatefulColors = getResources().getColorStateList(
                 R.color.notification_state_color_light);
@@ -106,31 +94,6 @@ public class NotificationBackgroundView extends View implements Dumpable,
                     com.android.internal.R.color.materialColorSurfaceContainerHigh);
         }
         mFocusOverlayStroke = getResources().getDimension(R.dimen.notification_focus_stroke_width);
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        updateAxBlurOverlayColor();
-        mAxBlurRenderer.onAttachedToWindow();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        mAxBlurRenderer.onDetachedFromWindow();
-        super.onDetachedFromWindow();
-    }
-
-    @Override
-    public void onVisibilityAggregated(boolean isVisible) {
-        super.onVisibilityAggregated(isVisible);
-        mAxBlurRenderer.onVisibilityAggregated(isVisible);
-    }
-
-    @Override
-    protected void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        updateAxBlurOverlayColor();
     }
 
     @Override
@@ -172,11 +135,8 @@ public class NotificationBackgroundView extends View implements Dumpable,
             }
 
             if (mBackground != null) {
-                boolean drewAxBlur = drawAxBlurBackground(canvas, backgroundBounds);
-                if (shouldDrawFallbackBackground(drewAxBlur)) {
-                    mBackground.setBounds(backgroundBounds);
-                    mBackground.draw(canvas);
-                }
+                mBackground.setBounds(backgroundBounds);
+                mBackground.draw(canvas);
             }
 
             canvas.restore();
@@ -269,45 +229,14 @@ public class NotificationBackgroundView extends View implements Dumpable,
                 left = (int) ((width - actualWidth) / 2.0f);
                 right = (int) (left + actualWidth);
             }
-            mBackgroundBounds.set(left, top, right, bottom);
-            boolean drewAxBlur = drawAxBlurBackground(canvas, mBackgroundBounds);
-            if (shouldDrawFallbackBackground(drewAxBlur)) {
-                drawable.setBounds(left, top, right, bottom);
-                drawable.draw(canvas);
-            }
+            drawable.setBounds(left, top, right, bottom);
+            drawable.draw(canvas);
         }
-    }
-
-    private boolean drawAxBlurBackground(Canvas canvas, Rect bounds) {
-        if (!mAxBlurEnabled
-                || !(mBackground instanceof LayerDrawable)
-                || bounds == null
-                || bounds.isEmpty()) {
-            return false;
-        }
-
-        mBackground.setBounds(bounds);
-        return mAxBlurRenderer.draw(
-                canvas,
-                mAxBlurKey,
-                bounds.left,
-                bounds.top,
-                bounds.right,
-                bounds.bottom,
-                mCornerRadii,
-                mAxBlurOverlayColor,
-                mBackground.getAlpha());
-    }
-
-    private boolean shouldDrawFallbackBackground(boolean drewAxBlur) {
-        return !drewAxBlur && (!mAxBlurEnabled || !mAxBlurRenderer.isCrossWindowBlurActive());
     }
 
     @Override
     protected boolean verifyDrawable(Drawable who) {
-        return super.verifyDrawable(who)
-                || who == mBackground
-                || mAxBlurRenderer.verifyDrawable(who);
+        return super.verifyDrawable(who) || who == mBackground;
     }
 
     @Override
@@ -360,20 +289,6 @@ public class NotificationBackgroundView extends View implements Dumpable,
     public void setCustomBackground(int drawableResId) {
         final Drawable d = mContext.getDrawable(drawableResId);
         setCustomBackground(d);
-    }
-
-    public void setAxBlurEnabled(boolean enabled) {
-        if (mAxBlurEnabled == enabled) {
-            return;
-        }
-        mAxBlurEnabled = enabled;
-        mAxBlurRenderer.setEnabled(enabled);
-        invalidate();
-    }
-
-    private void updateAxBlurOverlayColor() {
-        mAxBlurOverlayColor = AxBlurColors.surfaceBrightTint(getContext());
-        invalidate();
     }
 
     public Drawable getBaseBackgroundLayer() {

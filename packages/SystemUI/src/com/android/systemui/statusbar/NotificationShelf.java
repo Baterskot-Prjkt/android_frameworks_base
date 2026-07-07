@@ -986,14 +986,8 @@ public class NotificationShelf extends ActivatableNotificationView {
     private void setHideBackground(boolean hideBackground) {
         if (mHideBackground != hideBackground) {
             mHideBackground = hideBackground;
-            updateAxBlurEnabled();
             updateOutline();
         }
-    }
-
-    @Override
-    protected boolean shouldUseAxBlurBackground() {
-        return super.shouldUseAxBlurBackground() && !mHideBackground;
     }
 
     @Override
