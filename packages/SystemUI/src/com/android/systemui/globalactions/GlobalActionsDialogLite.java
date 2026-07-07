@@ -75,9 +75,7 @@ import android.telephony.ServiceState;
 import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.util.ArraySet;
-import android.util.DisplayMetrics;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.GestureDetector;
@@ -97,8 +95,7 @@ import android.widget.ImageView.ScaleType;
 import android.widget.LinearLayout;
 import android.widget.ListPopupWindow;
 import android.widget.TextView;
-import android.window.BackEvent;
-import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.NonNull;
@@ -106,8 +103,6 @@ import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 
-import com.android.axion.blur.AxBlurColors;
-import com.android.axion.blur.AxWindowBlurController;
 import com.android.app.animation.Interpolators;
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -191,8 +186,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private static final String INTERACTION_JANK_TAG = "global_actions";
 
     private static final boolean SHOW_SILENT_TOGGLE = true;
-    private static final float BACK_ANIMATION_MIN_SCALE = 0.9f;
-    private static final float BACK_ANIMATION_MARGIN_DP = 8f;
 
     /* Valid settings for global actions keys.
      * see config.xml config_globalActionList */
@@ -611,20 +604,17 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
         WindowManager.LayoutParams attrs = mDialog.getWindow().getAttributes();
         attrs.setTitle("GlobalActionsDialogLite");
-        attrs.width = MATCH_PARENT;
-        attrs.height = MATCH_PARENT;
         attrs.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         mDialog.getWindow().setAttributes(attrs);
         // Don't acquire soft keyboard focus, to avoid destroying state when capturing bugreports
         mDialog.getWindow().addFlags(FLAG_ALT_FOCUSABLE_IM);
-        AxWindowBlurController.applyBlurBehind(mDialog.getWindow(), mContext);
 
         DialogTransitionAnimator.Controller controller =
                 expandable != null ? expandable.dialogTransitionController(
                         new DialogCuj(InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN,
                                 INTERACTION_JANK_TAG)) : null;
         mUserTracker.addCallback(mOnUserSwitched, mBackgroundExecutor);
-        if (controller != null && !AxWindowBlurController.supportsBlur()) {
+        if (controller != null) {
             mDialogTransitionAnimator.show(mDialog, controller);
         } else {
             mDialog.show();
@@ -1784,7 +1774,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
      */
     @Override
     public void onShow(DialogInterface dialog) {
-        AxWindowBlurController.applyBlurBehind(((Dialog) dialog).getWindow(), mContext);
         mMetricsLogger.visible(MetricsEvent.POWER_MENU);
         mUiEventLogger.log(GlobalActionsEvent.GA_POWER_MENU_OPEN);
         mInteractor.onShown();
@@ -2273,8 +2262,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             if (QsInCompose.isEnabled()) {
                 int textAndIconColor = context.getColor(R.color.materialColorOnSurface);
                 messageView.setTextColor(textAndIconColor);
-                mIconView.setBackgroundTintList(context.getColorStateList(
-                        R.color.materialColorSurfaceContainerHighest));
+                mIconView.setBackgroundTintList(
+                        ColorStateList.valueOf(
+                                context.getColor(R.color.materialColorSurfaceContainerHighest)
+                        )
+                );
                 mIconView.setImageTintList(ColorStateList.valueOf(textAndIconColor));
             }
 
@@ -2748,34 +2740,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         private float mWindowDimAmount;
 
         protected ViewGroup mContainer;
-        private View mScrimView;
 
-        private float mBackStartY = Float.NaN;
-
-        private final OnBackAnimationCallback mBackAnimationCallback =
-                new OnBackAnimationCallback() {
-                    @Override
-                    public void onBackStarted(BackEvent backEvent) {
-                        mBackStartY = backEvent.getTouchY();
-                    }
-
-                    @Override
-                    public void onBackProgressed(BackEvent backEvent) {
-                        updateBackAnimation(backEvent);
-                    }
-
-                    @Override
-                    public void onBackCancelled() {
-                        resetBackAnimation();
-                    }
-
-                    @Override
-                    public void onBackInvoked() {
-                        resetBackAnimation();
-                        logOnBackInvocation();
-                        dismiss();
-                    }
-                };
+        private final OnBackInvokedCallback mOnBackInvokedCallback = () -> {
+            logOnBackInvocation();
+            dismiss();
+        };
 
         @VisibleForTesting
         protected GestureDetector.SimpleOnGestureListener mGestureListener =
@@ -2884,7 +2853,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             initializeLayout();
             mWindowDimAmount = getWindow().getAttributes().dimAmount;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                    OnBackInvokedDispatcher.PRIORITY_OVERLAY, mBackAnimationCallback);
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, mOnBackInvokedCallback);
             if (DEBUG) Log.d(TAG, "OnBackInvokedCallback handler registered");
         }
 
@@ -2897,7 +2866,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
         @Override
         public void onDetachedFromWindow() {
-            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(mBackAnimationCallback);
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(mOnBackInvokedCallback);
             if (DEBUG) Log.d(TAG, "OnBackInvokedCallback handler unregistered");
         }
 
@@ -2961,11 +2930,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             mOverflowPopup.show();
         }
 
-        public void showUsersMenu() {
-            mUsersDialog = GlobalActionsPowerDialog.create(mContext, mUsersAdapter);
-            mUsersDialog.show();
-        }
-
         protected int getLayoutResource() {
             return com.android.systemui.res.R.layout.global_actions_grid_lite;
         }
@@ -2988,8 +2952,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             mGlobalActionsLayout.setRotationListener(this::onRotate);
             mGlobalActionsLayout.setAdapter(mAdapter);
             mContainer = findViewById(com.android.systemui.res.R.id.global_actions_container);
-            mScrimView = findViewById(
-                    com.android.systemui.res.R.id.global_actions_background_scrim);
             mContainer.setOnTouchListener((v, event) -> {
                 mGestureDetector.onTouchEvent(event);
                 return v.onTouchEvent(event);
@@ -3020,7 +2982,9 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             }
             if (QsInCompose.isEnabled()) {
                 View v = findViewById(R.id.list);
-                v.setBackgroundTintList(AxBlurColors.surfaceContainerTintList(getContext()));
+                v.setBackgroundTintList(ColorStateList.valueOf(
+                        getContext().getColor(R.color.materialColorSurfaceContainerLow)
+                ));
             }
 
             // If user entered from the lock screen and smart lock was enabled, disable it
@@ -3075,7 +3039,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
         @Override
         protected void start() {
-            AxWindowBlurController.applyBlurBehind(getWindow(), mContext);
             mGlobalActionsLayout.updateList();
             mLightBarController.setGlobalActionsVisible(true);
 
@@ -3116,37 +3079,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         public void onBackPressed() {
             super.onBackPressed();
             logOnBackInvocation();
-        }
-
-        private void updateBackAnimation(BackEvent backEvent) {
-            float progress = Interpolators.BACK_GESTURE.getInterpolation(backEvent.getProgress());
-            float scale = 1f - progress * (1f - BACK_ANIMATION_MIN_SCALE);
-            DisplayMetrics displayMetrics = mGlobalActionsLayout.getResources().getDisplayMetrics();
-            float maxMarginPx = TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, BACK_ANIMATION_MARGIN_DP, displayMetrics);
-            float maxTranslationX = (displayMetrics.widthPixels
-                    - displayMetrics.widthPixels * BACK_ANIMATION_MIN_SCALE) * 0.5f - maxMarginPx;
-            float maxTranslationY = (displayMetrics.heightPixels
-                    - displayMetrics.heightPixels * BACK_ANIMATION_MIN_SCALE) * 0.5f - maxMarginPx;
-            float touchY = backEvent.getTouchY();
-            float progressY = Float.isNaN(touchY) || Float.isNaN(mBackStartY)
-                    ? 0f
-                    : (touchY - mBackStartY) / displayMetrics.heightPixels;
-            int direction = backEvent.getSwipeEdge() == BackEvent.EDGE_LEFT
-                    ? 1
-                    : backEvent.getSwipeEdge() == BackEvent.EDGE_RIGHT ? -1 : 0;
-            mGlobalActionsLayout.setTranslationX(progress * direction * maxTranslationX);
-            mGlobalActionsLayout.setTranslationY(progressY * maxTranslationY);
-            mGlobalActionsLayout.setScaleX(scale);
-            mGlobalActionsLayout.setScaleY(scale);
-        }
-
-        private void resetBackAnimation() {
-            mBackStartY = Float.NaN;
-            mGlobalActionsLayout.setTranslationX(0f);
-            mGlobalActionsLayout.setTranslationY(0f);
-            mGlobalActionsLayout.setScaleX(1f);
-            mGlobalActionsLayout.setScaleY(1f);
         }
 
         private void logOnBackInvocation() {
@@ -3201,19 +3133,12 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
             Window window = getWindow();
             int rotation = window.getWindowManager().getDefaultDisplay().getRotation();
-            boolean blurSupported = AxWindowBlurController.supportsBlur();
 
             animator.addUpdateListener(valueAnimator -> {
                 float progress = (float) valueAnimator.getAnimatedValue();
 
                 float alpha = isEnter ? progress : 1 - progress;
-                if (blurSupported) {
-                    mGlobalActionsLayout.setAlpha(1f);
-                    setListContentAlpha(alpha);
-                } else {
-                    mGlobalActionsLayout.setAlpha(alpha);
-                }
-                mScrimView.setAlpha(alpha);
+                mGlobalActionsLayout.setAlpha(alpha);
                 window.setDimAmount(mWindowDimAmount * alpha);
 
                 // TODO(b/213872558): Support devices that don't have their power button on the
@@ -3237,8 +3162,17 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             });
 
             animator.addListener(new AnimatorListenerAdapter() {
+                private int mPreviousLayerType;
+
+                @Override
+                public void onAnimationStart(Animator animation, boolean isReverse) {
+                    mPreviousLayerType = mGlobalActionsLayout.getLayerType();
+                    mGlobalActionsLayout.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                }
+
                 @Override
                 public void onAnimationEnd(Animator animation) {
+                    mGlobalActionsLayout.setLayerType(mPreviousLayerType, null);
                     if (then != null) {
                         then.run();
                     }
@@ -3246,16 +3180,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             });
 
             animator.start();
-        }
-
-        private void setListContentAlpha(float alpha) {
-            ViewGroup list = findViewById(R.id.list);
-            if (list == null) {
-                return;
-            }
-            for (int i = 0; i < list.getChildCount(); i++) {
-                list.getChildAt(i).setAlpha(alpha);
-            }
         }
 
         @Override

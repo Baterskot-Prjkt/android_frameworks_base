@@ -19,8 +19,6 @@ import android.annotation.NonNull;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,8 +27,6 @@ import android.view.WindowManager;
 import android.widget.ListAdapter;
 
 import androidx.constraintlayout.helper.widget.Flow;
-
-import com.android.axion.blur.AxWindowBlurController;
 
 /**
  * Creates a customized Dialog for displaying the Shut Down and Restart actions.
@@ -55,32 +51,17 @@ public class GlobalActionsPowerDialog {
 
         Resources res = context.getResources();
 
-        int nElementsWrap = res.getInteger(
-                com.android.systemui.res.R.integer.power_menu_lite_max_columns);
-        int nChildren = listView.getChildCount() - 1; // don't count flow element
-
-        // Avoid having just one action on the last row if there are more than 2 columns because
-        // it looks unbalanced. Instead, bring the column size down to balance better.
-        if (nChildren == nElementsWrap + 1 && nElementsWrap > 2) {
-            nElementsWrap -= 1;
-        }
-        flow.setMaxElementsWrap(nElementsWrap);
-
-        Dialog dialog = new Dialog(context,
-                com.android.systemui.res.R.style.Theme_SystemUI_Dialog_GlobalActionsPowerMenu);
+        Dialog dialog = new Dialog(context);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(listView);
 
         Window window = dialog.getWindow();
         window.setType(WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY);
         window.setTitle(""); // prevent Talkback from speaking first item name twice
-        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        window.setDimAmount(0f);
+        window.setBackgroundDrawable(res.getDrawable(
+                com.android.systemui.res.R.drawable.global_actions_lite_background,
+                context.getTheme()));
         window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        AxWindowBlurController.applyBlurBehind(window, context);
-        dialog.setOnShowListener(
-                dialogInterface -> AxWindowBlurController.applyBlurBehind(window, context));
 
         return dialog;
     }

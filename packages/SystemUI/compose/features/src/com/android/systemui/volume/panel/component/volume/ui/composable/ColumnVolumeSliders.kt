@@ -63,7 +63,6 @@ import com.android.systemui.Flags
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.res.R
 import com.android.systemui.volume.panel.component.volume.slider.ui.viewmodel.SliderViewModel
-import com.android.axion.blur.AxBlurSurfaceDefaults
 import com.google.common.annotations.VisibleForTesting
 import platform.test.motion.compose.values.MotionTestValueKey
 import platform.test.motion.compose.values.motionTestValues
@@ -278,7 +277,7 @@ private fun RowScope.ExpandButton(
             onClick = { onExpandedChanged(!isExpanded) },
             colors =
                 IconButtonDefaults.iconButtonColors(
-                    containerColor = AxBlurSurfaceDefaults.surfaceColor(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             shape = RoundedCornerShape(12.dp),
