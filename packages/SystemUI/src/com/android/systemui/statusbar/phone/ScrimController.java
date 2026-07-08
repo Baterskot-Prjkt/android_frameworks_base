@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -508,20 +508,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                         if (mKeyguardStateController.isKeyguardFadingAway()) {
                             mStatusBarKeyguardViewManager.onKeyguardFadedAway();
                         }
-
-                        // Force reset all scrim transparency when the keyguard transition finishes
-                        mInFrontAlpha = 0f;
-                        mBehindAlpha = 0f;
-                        mNotificationsAlpha = 0f;
-
-                        if (mScrimInFront != null) mScrimInFront.setViewAlpha(0f);
-                        if (mScrimBehind != null) mScrimBehind.setViewAlpha(0f);
-                        if (mNotificationsScrim != null) mNotificationsScrim.setViewAlpha(0f);
-
-                        mInFrontTint = Color.TRANSPARENT;
-                        mBehindTint = Color.TRANSPARENT;
-                        mNotificationsTint = Color.TRANSPARENT;
-
                         dispatchScrimsVisible();
                         dispatchBackScrimState(mScrimBehind.getViewAlpha());
                     }
@@ -728,7 +714,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
                 || (mState == ScrimState.AOD && !mDozeParameters.getDisplayNeedsBlanking())) {
             // Scheduling a frame isn't enough when:
             //  • Leaving doze and we need to modify scrim color immediately
-            //  • ColorFade Feld down and scrim cannot wait for pre-draw.
+            //  • ColorFade will not kick-in and scrim cannot wait for pre-draw.
             onPreDraw();
         } else {
             // Schedule a frame
@@ -774,13 +760,13 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     /**
      * Sets the scrim behind alpha keyguard values. This is how much the keyguard will be dimmed.
      *
-     * @param scrimBehindAlpha keyguard alpha value of the scrim behind
+     * @param scrimBehindAlphaKeyguard alpha value of the scrim behind
      */
     private void setScrimBehindValues(float scrimBehindAlphaKeyguard) {
         mScrimBehindAlphaKeyguard = scrimBehindAlphaKeyguard;
         ScrimState[] states = ScrimState.values();
         for (ScrimState state : states) {
-            state.setScrimBehindAlphaKeyguard(mScrimBehindAlphaKeyguard);
+            state.setScrimBehindAlphaKeyguard(scrimBehindAlphaKeyguard);
         }
         scheduleUpdate();
     }
@@ -1211,10 +1197,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         if (mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit()) {
             if (mClipsQsScrim) {
                 behindTint = ColorUtils.blendARGB(ScrimState.BOUNCER.getNotifTint(),
-                        state.getNotifTint(), interpolatedFract);
+                    state.getNotifTint(), interpolatedFract);
             } else {
                 behindTint = ColorUtils.blendARGB(ScrimState.BOUNCER.getBehindTint(),
-                        state.getBehindTint(), interpolatedFract);
+                    state.getBehindTint(), interpolatedFract);
             }
         }
         if (mQsExpansion > 0) {
@@ -1569,11 +1555,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         // When unlocking with fingerprint, we'll fade the scrims from black to transparent.
         // At the end of the animation we need to remove the tint.
         if (state == ScrimState.UNLOCKED) {
-            
-            mInFrontAlpha = 0f;
-            mBehindAlpha = 0f;
-            mNotificationsAlpha = 0f;
-
             mInFrontTint = Color.TRANSPARENT;
             mBehindTint = mState.getBehindTint();
             mNotificationsTint = mState.getNotifTint();
